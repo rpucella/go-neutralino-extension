@@ -1,4 +1,4 @@
-module github.com/rpucella/go-neutralino-extensions
+module github.com/rpucella/go-neutralino-extension
 
 go 1.23.3
 
