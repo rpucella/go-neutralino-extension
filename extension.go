@@ -23,6 +23,8 @@ type ConnInfo struct {
 	ExtId string `json:"nlExtensionId"`
 	conn *websocket.Conn
 	process ProcessFn
+	// Channel to write to websocket since gorilla is not thread-safe.
+	write chan []byte
 }
 
 /*
@@ -58,6 +60,23 @@ func ReadConnInfo(r io.Reader) (ConnInfo, error) {
 //      "data": <data object to broadcast>
 //   }
 // }
+
+func (ci ConnInfo) writePump() {
+    for {
+        select {
+        case message, ok := <-ci.write:
+            if !ok {
+                // The client hub closed the channel. Bail.
+                return
+            }
+            if err := ci.conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
+                return
+            }
+        }
+    }
+}
+
+// Coudld massively simply this by putting the send message in the writePump directly?
 func (ci ConnInfo) SendMessage(event string, data map[string]any) error {
 	// Buiild a message.
 	dataObj := make(map[string]any)
@@ -76,7 +95,8 @@ func (ci ConnInfo) SendMessage(event string, data map[string]any) error {
 	if ci.conn == nil {
 		return fmt.Errorf("in SendMessage: connection is nil")
 	}
-	ci.conn.WriteMessage(websocket.BinaryMessage, msg)
+
+	ci.write <- msg // conn.WriteMessage(websocket.BinaryMessage, msg)
 	return nil
 }
 
@@ -101,6 +121,11 @@ func (ci ConnInfo) StartMessageLoop(process ProcessFn) error {
 	msgCh := make(chan map[string]any, 1)
 	defer close(msgCh)
 
+	writeCh := make(chan []byte, 256)
+	defer close(writeCh)
+	ci.write = writeCh
+
+	go ci.writePump()
 	go ci.readMessages(doneCh, msgCh)
 
 	for {
