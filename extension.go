@@ -154,8 +154,8 @@ func (ci ConnInfo) StartMessageLoop(process ProcessFn) error {
 func (ci *ConnInfo) processMessage(msgObj map[string]any) {
 	eventIfc, ok := msgObj["event"]
 	if !ok {
-		// This may be a response to an app.broadcast sent in response to a message!
-		log.Printf("no event field: %s\n", msgObj)
+		// This may be a response to an app.broadcast sent in response to a message. Don't show.
+		// log.Printf("no event field: %s\n", msgObj)
 		return
 	}
 	event, ok := eventIfc.(string)
